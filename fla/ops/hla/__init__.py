@@ -6,7 +6,9 @@
 #   https://github.com/fla-org/flash-linear-attention/graphs/contributors
 
 from .recurrent import recurrent_hla
+from .triton_recurrent import triton_recurrent_hla
 
 __all__ = [
     "recurrent_hla",
+    "triton_recurrent_hla",
 ]

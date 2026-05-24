@@ -5,10 +5,11 @@
 # For a list of all contributors, visit:
 #   https://github.com/fla-org/flash-linear-attention/graphs/contributors
 
+import pytest
 import torch
 
 from fla.layers import HigherOrderLinearAttention
-from fla.ops.hla import recurrent_hla
+from fla.ops.hla import recurrent_hla, triton_recurrent_hla
 
 
 def _signed_clamp_min(x: torch.Tensor, eps: float) -> torch.Tensor:
@@ -98,6 +99,19 @@ def test_recurrent_hla_normalized_preserves_denominator_sign():
     expected = _parallel_masked_hla(q, k, v, normalize=True)
     actual, _ = recurrent_hla(q, k, v, normalize=True)
     torch.testing.assert_close(actual, expected, rtol=1e-10, atol=1e-10)
+
+
+@pytest.mark.skipif(not torch.cuda.is_available(), reason="triton HLA requires CUDA")
+@pytest.mark.parametrize("normalize", [False, True])
+def test_triton_recurrent_hla_matches_reference(normalize: bool):
+    torch.manual_seed(3)
+    q = torch.randn(2, 17, 3, 16, device="cuda", dtype=torch.float32)
+    k = torch.randn(2, 17, 3, 16, device="cuda", dtype=torch.float32)
+    v = torch.randn(2, 17, 3, 16, device="cuda", dtype=torch.float32)
+
+    expected, _ = recurrent_hla(q, k, v, normalize=normalize)
+    actual, _ = triton_recurrent_hla(q, k, v, normalize=normalize)
+    torch.testing.assert_close(actual, expected, rtol=5e-3, atol=5e-3)
 
 
 def test_hla_layer_forward_shape():

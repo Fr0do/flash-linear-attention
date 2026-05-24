@@ -271,6 +271,32 @@ register_op(OpConfig(
     category='simple_qkv',
 ))
 
+_hla_default_shapes = {
+    'B1_T8192_H32_D16':   {'B': 1, 'T': 8192,  'H': 32, 'D': 16},
+    'B2_T8192_H16_D32':   {'B': 2, 'T': 8192,  'H': 16, 'D': 32},
+    'B4_T4096_H16_D32':   {'B': 4, 'T': 4096,  'H': 16, 'D': 32},
+    'B4_T2048_H16_D16':   {'B': 4, 'T': 2048,  'H': 16, 'D': 16},
+    'B8_T1024_H8_D16':    {'B': 8, 'T': 1024,  'H': 8,  'D': 16},
+}
+
+register_op(OpConfig(
+    name='triton_recurrent_hla',
+    import_path='fla.ops.hla',
+    inputs={**_simple_qkv},
+    skip_backward=True,
+    default_shapes=_hla_default_shapes,
+    category='hla',
+))
+
+register_op(OpConfig(
+    name='recurrent_hla',
+    import_path='fla.ops.hla',
+    inputs={**_simple_qkv},
+    skip_backward=True,
+    default_shapes=_hla_default_shapes,
+    category='hla',
+))
+
 register_op(OpConfig(
     name='chunk_linear_attn',
     import_path='fla.ops.linear_attn',
