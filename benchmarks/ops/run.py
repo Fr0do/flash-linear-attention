@@ -233,6 +233,7 @@ def benchmark_op(
     op_name: str,
     shapes: dict[str, dict[str, int]],
     modes: list[str] | None = None,
+    use_op_default_shapes: bool = True,
 ) -> list[dict]:
     """Benchmark a single op across all *shapes* and *modes*.
 
@@ -250,7 +251,7 @@ def benchmark_op(
         modes = [m for m in modes if m != 'fwdbwd']
 
     # Per-op shape override (e.g., AttnRes uses an `L` axis not in B/T/H/D)
-    if config.default_shapes is not None:
+    if use_op_default_shapes and config.default_shapes is not None:
         shapes = config.default_shapes
 
     # Filter shapes by dim_constraints
@@ -289,12 +290,16 @@ def benchmark_op(
             out_tensor = out[0] if config.output_is_tuple else out
             do = torch.randn_like(out_tensor)
 
-            def _fwdbwd_fn(inputs=inputs, do=do):
-                result = op_fn(**inputs, **config.extra_kwargs)
-                t = result[0] if config.output_is_tuple else result
-                t.backward(do)
+            if 'fwdbwd' in modes:
+                def _warmup_fn(inputs=inputs, do=do):
+                    result = op_fn(**inputs, **config.extra_kwargs)
+                    t = result[0] if config.output_is_tuple else result
+                    t.backward(do)
+            else:
+                def _warmup_fn(inputs=inputs):
+                    return op_fn(**inputs, **config.extra_kwargs)
 
-            _warmup_autotune(_fwdbwd_fn)
+            _warmup_autotune(_warmup_fn)
         except Exception as e:
             logger.warning(f"Warmup failed for {op_name} @ {shape_name}: {e}")
             failed_shapes.add(shape_name)
@@ -640,7 +645,12 @@ def main():
     all_results = []
     for op_name in op_names:
         try:
-            all_results.extend(benchmark_op(op_name, shape_configs, modes=args.modes))
+            all_results.extend(benchmark_op(
+                op_name,
+                shape_configs,
+                modes=args.modes,
+                use_op_default_shapes=args.custom_shapes is None,
+            ))
         except Exception as e:
             logger.error(f"Failed to benchmark {op_name}: {e}")
 
